@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $releaseRoot = Join-Path $root "release"
@@ -29,7 +30,7 @@ dotnet publish (Join-Path $root "CutterStudio\CutterStudio.csproj") `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -o $clientOut
 
-dotnet publish (Join-Path $root "CutterStudio.Admin\CutterStudio.Admin.csproj") `
+dotnet publish (Join-Path $root "CutterStudio.LicenseAdmin\CutterStudio.LicenseAdmin.csproj") `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
@@ -37,7 +38,7 @@ dotnet publish (Join-Path $root "CutterStudio.Admin\CutterStudio.Admin.csproj") 
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -o $adminOut
 
-dotnet publish (Join-Path $root "CutterStudio.Updater\CutterStudio.Updater.csproj") `
+dotnet publish (Join-Path $root "CutterStudio.UpdatePublisher\CutterStudio.UpdatePublisher.csproj") `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `

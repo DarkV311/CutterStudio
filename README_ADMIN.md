@@ -3,7 +3,7 @@
 This folder now includes three complete executables under `F:\Cutter\release`:
 
 - Main client: `F:\Cutter\release\CutterStudio\CutterStudio.exe`
-- License/update admin: `F:\Cutter\release\LicenseAdmin\CutterStudio.Admin.exe`
+- Desktop license admin: `F:\Cutter\release\LicenseAdmin\CutterStudio.Admin.exe`
 - Standalone updater helper: `F:\Cutter\release\Updater\CutterStudio.Updater.exe`
 
 The admin server source is:
@@ -13,20 +13,16 @@ The admin server source is:
 - Database: `publish\admin\App_Data\admin.db`
 - Uploaded releases / update files: `F:\Cutter\Updates`
 
-## Run locally
+## Run desktop license admin
 
 ```powershell
 Set-Location F:\Cutter\release\LicenseAdmin
-$env:CUTTER_ADMIN_PASSWORD = "change-this-password"
-$env:ASPNETCORE_URLS = "http://0.0.0.0:5080"
 .\CutterStudio.Admin.exe
 ```
 
-Open:
-
-```text
-http://localhost:5080/admin
-```
+This opens a normal Windows desktop admin window. It also runs the activation
+API in the background on `http://localhost:5080` so Cutter Studio can validate
+licenses.
 
 ## Admin features
 
