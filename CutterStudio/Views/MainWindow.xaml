@@ -1,0 +1,265 @@
+<Window x:Class="CutterStudio.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CutterStudio.Controls"
+        Title="Cutter Studio" Width="1440" Height="900"
+        MinWidth="1080" MinHeight="680"
+        WindowStartupLocation="CenterScreen">
+    <Window.InputBindings>
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteCommand}"/>
+    </Window.InputBindings>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                Padding="10,7">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button Command="{Binding PasteCommand}" ToolTip="Paste SVG or XAML vector from clipboard">Paste</Button>
+                    <Button Command="{Binding ImportCommand}">Import SVG</Button>
+                    <Button Command="{Binding SaveCommand}">Save Project</Button>
+                    <Button Command="{Binding OpenCommand}">Open Project</Button>
+                    <Separator Margin="8,4"/>
+                    <Button Click="FitButton_Click">Fit</Button>
+                    <Button Click="ZoomOutButton_Click">−</Button>
+                    <Button Click="ZoomInButton_Click">+</Button>
+                    <Button Command="{Binding ExportCommand}">Export HPGL</Button>
+                    <Button Command="{Binding TestCutterCommand}"
+                            ToolTip="Moves the cutter head 10 mm with the blade raised">Test Cutter</Button>
+                    <Button Click="CutterPreviewButton_Click"
+                            ToolTip="Shows the cutter, artwork, and minimum required vinyl size">
+                        Vinyl Preview
+                    </Button>
+                    <Button Command="{Binding AreaTestCommand}"
+                            ToolTip="Moves around the current artwork boundary using the selected blade mode">
+                        Area Test
+                    </Button>
+                    <Button Command="{Binding ExportPrintCutCommand}"
+                            ToolTip="Exports artwork with registration marks for printed contour cutting">
+                        Print+Cut SVG
+                    </Button>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding CutCommand}"
+                            Padding="24,8">Cut</Button>
+                </StackPanel>
+                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
+                         Width="260" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Margin="18,0" ToolTip="Project name"/>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="310"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" Padding="12">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="RECENT PROJECTS" Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="11" FontWeight="SemiBold" Margin="4,2,4,10"/>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <Button Command="{Binding InsertProjectCommand}"
+                                ToolTip="Adds the selected project's artwork without replacing the current project">
+                            Insert into current
+                        </Button>
+                        <Button Command="{Binding OpenCommand}">Open selected</Button>
+                    </StackPanel>
+                    <ListBox ItemsSource="{Binding RecentProjects}"
+                             SelectedItem="{Binding SelectedRecentProject}"
+                             MouseDoubleClick="RecentProjects_DoubleClick">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis"
+                                           Padding="7,8" ToolTip="{Binding DisplayText}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
+                          Background="{StaticResource BorderBrush}"/>
+
+            <Border Grid.Column="2" Background="#0C0E12">
+                <controls:ArtworkCanvas x:Name="PreviewCanvas"
+                                        Document="{Binding PreviewArtwork}"
+                                        ArtworkMoved="PreviewCanvas_ArtworkMoved"
+                                        ZoomChanged="PreviewCanvas_ZoomChanged"/>
+            </Border>
+
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch"
+                          Background="{StaticResource BorderBrush}"/>
+
+            <Border Grid.Column="4" Background="{StaticResource PanelBrush}" Padding="14">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="CUTTER SETTINGS" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" FontWeight="SemiBold" Margin="2,2,2,12"/>
+
+                        <GroupBox Header="Connection">
+                            <StackPanel>
+                                <TextBlock Text="Cutter profile" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding CutterProfiles}"
+                                          SelectedItem="{Binding Settings.CutterProfile}"/>
+                                <Button Command="{Binding DetectCutterCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        ToolTip="Detects USB/COM identity and suggests a matching cutter profile">
+                                    Detect Cutter
+                                </Button>
+                                <TextBlock Text="COM port" Foreground="{StaticResource MutedTextBrush}"/>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Command="{Binding RefreshPortsCommand}"
+                                            Padding="9,5" Margin="6,3,0,8">Refresh</Button>
+                                    <ComboBox ItemsSource="{Binding AvailablePorts}"
+                                              SelectedItem="{Binding Settings.PortName}"/>
+                                </DockPanel>
+                                <TextBlock Text="Baud rate" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding BaudRates}"
+                                          SelectedItem="{Binding Settings.BaudRate}"/>
+                                <TextBlock Text="Flow control" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding FlowControlModes}"
+                                          SelectedItem="{Binding Settings.FlowControl}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Blade">
+                            <StackPanel>
+                                <TextBlock Text="Speed" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.Speed, UpdateSourceTrigger=LostFocus}"
+                                         PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                         DataObject.Pasting="NumericTextBox_OnPaste"/>
+                                <TextBlock Text="Pressure" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.Pressure, UpdateSourceTrigger=LostFocus}"
+                                         PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                         DataObject.Pasting="NumericTextBox_OnPaste"/>
+                                <TextBlock Text="Passes" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.Passes, UpdateSourceTrigger=LostFocus}"
+                                         PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                         DataObject.Pasting="NumericTextBox_OnPaste"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Transform">
+                            <StackPanel>
+                                <TextBlock Text="Scale (%)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ScalePercent, UpdateSourceTrigger=LostFocus}"/>
+                                <CheckBox Content="Mirror horizontally" IsChecked="{Binding Settings.Mirror}"/>
+                                <CheckBox Content="Rotate 90°" IsChecked="{Binding Settings.Rotate90}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Layout">
+                            <StackPanel>
+                                <TextBlock Text="Material width (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.MaterialWidthMm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Safety margin (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.VinylMarginMm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Area test mode" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding AreaTestModes}"
+                                          SelectedItem="{Binding Settings.AreaTestMode}"/>
+                                <TextBlock Text="Copies" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.Copies, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Copy spacing (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.CopySpacingMm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Position X (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.OffsetXmm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Position Y (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.OffsetYmm, UpdateSourceTrigger=LostFocus}"/>
+                                <CheckBox Content="Automatic nesting" IsChecked="{Binding Settings.AutomaticNesting}"/>
+                                <CheckBox Content="Add weed border" IsChecked="{Binding Settings.WeedBorder}"/>
+                                <StackPanel Margin="18,0,0,0">
+                                    <TextBlock Text="Border margin (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                    <TextBox Text="{Binding Settings.WeedBorderMarginMm, UpdateSourceTrigger=LostFocus}"
+                                             IsEnabled="{Binding Settings.WeedBorder}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Print &amp; Cut Correction">
+                            <StackPanel>
+                                <CheckBox Content="Enable contour correction"
+                                          IsChecked="{Binding Settings.ContourCorrectionEnabled}"/>
+                                <TextBlock Text="Offset X (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourOffsetXmm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Offset Y (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourOffsetYmm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Rotation (degrees)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourRotationDeg, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Scale X (%)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourScaleXPercent, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Scale Y (%)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourScaleYPercent, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Registration mark margin (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.RegistrationMarkMarginMm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Registration mark size (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.RegistrationMarkSizeMm, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Registration mark style" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding RegistrationMarkStyles}"
+                                          SelectedItem="{Binding Settings.RegistrationMarkStyle}"/>
+                                <CheckBox Content="Cut contour box around print"
+                                          IsChecked="{Binding Settings.CutContourBox}"/>
+                                <TextBlock Text="Contour gap (mm)" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.ContourGapMm, UpdateSourceTrigger=LostFocus}"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Licensing &amp; Updates">
+                            <StackPanel>
+                                <TextBlock Text="Server URL" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.LicenseServerUrl, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="License key" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.LicenseKey, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="{Binding Settings.LicenseStatus}" Foreground="{StaticResource AccentBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <Button Command="{Binding ActivateLicenseCommand}">Activate License</Button>
+                                <Separator Margin="0,8"/>
+                                <TextBlock Text="Update source" Foreground="{StaticResource MutedTextBrush}"/>
+                                <ComboBox ItemsSource="{Binding UpdateSources}"
+                                          SelectedItem="{Binding Settings.UpdateSource}"/>
+                                <TextBlock Text="GitHub owner" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.GitHubOwner, UpdateSourceTrigger=LostFocus}"
+                                         ToolTip="Example: your GitHub username or organization"/>
+                                <TextBlock Text="GitHub repo" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.GitHubRepo, UpdateSourceTrigger=LostFocus}"
+                                         ToolTip="Example: CutterStudio"/>
+                                <TextBlock Text="Direct manifest URL" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBox Text="{Binding Settings.DirectManifestUrl, UpdateSourceTrigger=LostFocus}"
+                                         ToolTip="Optional JSON manifest URL using the same latest-release format"/>
+                                <Button Command="{Binding CheckUpdateCommand}">Check Update</Button>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <TextBlock Text="{Binding EstimatedTimeText}" Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" Margin="3,2,3,12" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding RequiredVinylText}" Foreground="{StaticResource TextBrush}"
+                                   FontWeight="SemiBold" Margin="3,0,3,12" TextWrapping="Wrap"/>
+                        <ProgressBar Minimum="0" Maximum="100" Height="8"
+                                     Value="{Binding TransferProgress, Mode=OneWay}" Margin="3,0,3,5"/>
+                        <Button Command="{Binding CancelTransferCommand}">Cancel transfer</Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
+                Padding="12,7">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" x:Name="ZoomText" Text="100%" Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding DimensionsText}" Margin="0,0,24,0"
+                           Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

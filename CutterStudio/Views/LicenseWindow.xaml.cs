@@ -1,0 +1,66 @@
+using System.Windows;
+using CutterStudio.Models;
+using CutterStudio.Services;
+
+namespace CutterStudio.Views;
+
+public partial class LicenseWindow : Window
+{
+    private readonly IUserSettingsService _settingsService;
+    private readonly ILicenseUpdateService _licenseUpdate;
+    private readonly CutterSettings _settings;
+
+    public LicenseWindow(IUserSettingsService settingsService, ILicenseUpdateService licenseUpdate)
+    {
+        InitializeComponent();
+        _settingsService = settingsService;
+        _licenseUpdate = licenseUpdate;
+        _settings = settingsService.Load();
+        ServerUrlBox.Text = _settings.LicenseServerUrl;
+        LicenseKeyBox.Text = _settings.LicenseKey;
+        StatusText.Text = _settings.LicenseStatus;
+    }
+
+    public static bool IsActivated(CutterSettings settings) =>
+        settings.LicenseStatus.StartsWith("Active", StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrWhiteSpace(settings.LicenseKey);
+
+    private async void ActivateButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActivateButton.IsEnabled = false;
+        StatusText.Text = "Activating...";
+        try
+        {
+            var result = await _licenseUpdate.ActivateAsync(ServerUrlBox.Text, LicenseKeyBox.Text);
+            _settings.LicenseServerUrl = ServerUrlBox.Text.Trim();
+            _settings.LicenseKey = LicenseKeyBox.Text.Trim();
+            _settings.LicenseStatus = result.Valid
+                ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
+                : $"Invalid: {result.Status}";
+            _settingsService.Save(_settings);
+
+            if (result.Valid)
+            {
+                DialogResult = true;
+                Close();
+                return;
+            }
+
+            StatusText.Text = result.Message;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = ex.Message;
+        }
+        finally
+        {
+            ActivateButton.IsEnabled = true;
+        }
+    }
+
+    private void ExitButton_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
+    }
+}

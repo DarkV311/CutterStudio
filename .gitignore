@@ -1,0 +1,31 @@
+# Build output
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Published executables and update payloads
+dist/
+publish/
+Updates/
+release/
+*.zip
+*.msi
+
+# Local databases / runtime data
+App_Data/
+*.db
+*.db-shm
+*.db-wal
+
+# User / IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.cache
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
