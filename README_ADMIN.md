@@ -100,7 +100,7 @@ The output goes to:
 F:\Cutter\release\CutterStudio\CutterStudio.exe
 F:\Cutter\release\LicenseAdmin\CutterStudio.Admin.exe
 F:\Cutter\release\Updater\CutterStudio.Updater.exe
-F:\Cutter\release\CutterStudio-win-x64-v1.0.1.zip
+F:\Cutter\release\CutterStudio-win-x64-v1.0.2.zip
 ```
 
 ## GitHub Releases updates

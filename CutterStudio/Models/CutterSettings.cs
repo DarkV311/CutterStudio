@@ -43,6 +43,8 @@ public sealed class CutterSettings : ObservableObject
     private string _licenseServerUrl = "http://localhost:5080";
     private string _licenseKey = "";
     private string _licenseStatus = "Not activated";
+    private DateTime? _licenseExpiresUtc;
+    private DateTime? _licenseLastCheckedUtc;
     private UpdateSourceKind _updateSource = UpdateSourceKind.GitHubReleases;
     private string _githubOwner = "DarkV311";
     private string _githubRepo = "CutterStudio";
@@ -84,6 +86,8 @@ public sealed class CutterSettings : ObservableObject
     public string LicenseServerUrl { get => _licenseServerUrl; set => SetProperty(ref _licenseServerUrl, value); }
     public string LicenseKey { get => _licenseKey; set => SetProperty(ref _licenseKey, value); }
     public string LicenseStatus { get => _licenseStatus; set => SetProperty(ref _licenseStatus, value); }
+    public DateTime? LicenseExpiresUtc { get => _licenseExpiresUtc; set => SetProperty(ref _licenseExpiresUtc, value); }
+    public DateTime? LicenseLastCheckedUtc { get => _licenseLastCheckedUtc; set => SetProperty(ref _licenseLastCheckedUtc, value); }
     public UpdateSourceKind UpdateSource { get => _updateSource; set => SetProperty(ref _updateSource, value); }
     public string GitHubOwner { get => _githubOwner; set => SetProperty(ref _githubOwner, value); }
     public string GitHubRepo { get => _githubRepo; set => SetProperty(ref _githubRepo, value); }

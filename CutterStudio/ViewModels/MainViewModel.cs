@@ -479,6 +479,8 @@ public sealed class MainViewModel : ObservableObject
             Settings.LicenseStatus = result.Valid
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
+            Settings.LicenseExpiresUtc = result.ExpiresUtc;
+            Settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             PersistUserSettings();
             _dialogs.ShowInfo(result.Message, "License");
             StatusText = $"License status: {Settings.LicenseStatus}";
@@ -612,9 +614,8 @@ public sealed class MainViewModel : ObservableObject
             Settings.RegistrationMarkStyle = saved.RegistrationMarkStyle;
             Settings.CutContourBox = saved.CutContourBox;
             Settings.ContourGapMm = saved.ContourGapMm;
-            Settings.LicenseServerUrl = string.IsNullOrWhiteSpace(saved.LicenseServerUrl) ? Settings.LicenseServerUrl : saved.LicenseServerUrl;
-            Settings.LicenseKey = saved.LicenseKey;
-            Settings.LicenseStatus = saved.LicenseStatus;
+            // License identity belongs to the local machine, not to project files.
+            // Do not restore saved project license fields over the user's active license.
             Settings.UpdateSource = saved.UpdateSource;
             Settings.GitHubOwner = saved.GitHubOwner;
             Settings.GitHubRepo = saved.GitHubRepo;

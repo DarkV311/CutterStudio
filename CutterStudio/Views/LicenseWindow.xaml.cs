@@ -37,6 +37,8 @@ public partial class LicenseWindow : Window
             _settings.LicenseStatus = result.Valid
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
+            _settings.LicenseExpiresUtc = result.ExpiresUtc;
+            _settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             _settingsService.Save(_settings);
 
             if (result.Valid)

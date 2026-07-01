@@ -1,4 +1,5 @@
 using System.Windows;
+using CutterStudio.Models;
 using CutterStudio.Services;
 using CutterStudio.ViewModels;
 using CutterStudio.Views;
@@ -42,7 +43,8 @@ public partial class App : Application
 
             var settingsService = _host.Services.GetRequiredService<IUserSettingsService>();
             var settings = settingsService.Load();
-            if (!LicenseWindow.IsActivated(settings))
+            var licenseUpdate = _host.Services.GetRequiredService<ILicenseUpdateService>();
+            if (!await ValidateSavedLicenseAsync(settingsService, licenseUpdate, settings))
             {
                 var licenseWindow = _host.Services.GetRequiredService<LicenseWindow>();
                 if (licenseWindow.ShowDialog() != true)
@@ -71,5 +73,32 @@ public partial class App : Application
         await _host.StopAsync(TimeSpan.FromSeconds(3));
         _host.Dispose();
         base.OnExit(e);
+    }
+
+    private static async Task<bool> ValidateSavedLicenseAsync(
+        IUserSettingsService settingsService,
+        ILicenseUpdateService licenseUpdate,
+        CutterSettings settings)
+    {
+        if (!LicenseWindow.IsActivated(settings))
+            return false;
+
+        try
+        {
+            var result = await licenseUpdate.ActivateAsync(settings.LicenseServerUrl, settings.LicenseKey);
+            settings.LicenseStatus = result.Valid
+                ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
+                : $"Invalid: {result.Status}";
+            settings.LicenseExpiresUtc = result.ExpiresUtc;
+            settings.LicenseLastCheckedUtc = DateTime.UtcNow;
+            settingsService.Save(settings);
+            return result.Valid;
+        }
+        catch
+        {
+            settings.LicenseStatus = "Invalid: server_unreachable";
+            settingsService.Save(settings);
+            return false;
+        }
     }
 }

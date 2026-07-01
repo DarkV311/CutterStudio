@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Diagnostics;
 using System.Text;
 using CutterStudio.Admin;
 using Microsoft.AspNetCore.Authentication;
@@ -142,6 +143,19 @@ app.MapPost("/admin/releases/create", async (HttpContext context, AdminRepositor
         form["published"] == "on");
     return Results.Redirect("/admin");
 }).RequireAuthorization();
+
+_ = Task.Run(async () =>
+{
+    await Task.Delay(1200);
+    try
+    {
+        Process.Start(new ProcessStartInfo("http://localhost:5080/admin") { UseShellExecute = true });
+    }
+    catch
+    {
+        // The admin server still runs even if the browser cannot be opened automatically.
+    }
+});
 
 app.Run();
 
