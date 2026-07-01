@@ -43,6 +43,11 @@ public partial class LicenseWindow : Window
 
             if (result.Valid)
             {
+                MessageBox.Show(
+                    "License activated successfully. Cutter Studio will open now.",
+                    "License Activated",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 DialogResult = true;
                 Close();
                 return;
@@ -52,7 +57,9 @@ public partial class LicenseWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = ex.Message;
+            StatusText.Text = ex.Message.Contains("localhost:5080", StringComparison.OrdinalIgnoreCase)
+                ? "License service is not running. Open CutterStudio.Admin.exe first, then try again."
+                : ex.Message;
         }
         finally
         {
