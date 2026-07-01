@@ -24,6 +24,7 @@ public sealed class MainForm : Form
     {
         _repository = repository;
         _apiStatus = apiStatus;
+        _publicUrlBox.Text = repository.ServerUrl;
 
         Text = $"Cutter Studio License Admin v{AppVersion()}";
         Width = 1180;
@@ -144,29 +145,46 @@ public sealed class MainForm : Form
             ? null
             : DateTime.SpecifyKind(_expiryPicker.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime();
 
-        var license = await _repository.CreateLicenseAsync(
-            _nameBox.Text,
-            _emailBox.Text,
-            expiry,
-            (int)_maxActivationsBox.Value,
-            _notesBox.Text);
+        try
+        {
+            var license = await _repository.CreateLicenseAsync(
+                _nameBox.Text,
+                _emailBox.Text,
+                expiry,
+                (int)_maxActivationsBox.Value,
+                _notesBox.Text);
 
-        Clipboard.SetText(license.LicenseKey);
-        _statusLabel.Text = "License created and copied to clipboard.";
-        _nameBox.Clear();
-        _emailBox.Clear();
-        _notesBox.Clear();
-        await RefreshLicensesAsync();
+            Clipboard.SetText(license.LicenseKey);
+            _statusLabel.Text = "License created on VPS and copied to clipboard.";
+            _nameBox.Clear();
+            _emailBox.Clear();
+            _notesBox.Clear();
+            await RefreshLicensesAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "License Admin", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _statusLabel.Text = "Create failed.";
+        }
     }
 
     private async Task RefreshLicensesAsync(bool showStatus = true)
     {
-        _rows.Clear();
-        var licenses = await _repository.GetLicensesAsync();
-        foreach (var license in licenses)
-            _rows.Add(new LicenseGridRow(license));
-        if (showStatus)
-            _statusLabel.Text = $"Loaded {licenses.Count} license(s).";
+        try
+        {
+            _rows.Clear();
+            var licenses = await _repository.GetLicensesAsync();
+            foreach (var license in licenses)
+                _rows.Add(new LicenseGridRow(license));
+            if (showStatus)
+                _statusLabel.Text = $"Loaded {licenses.Count} license(s) from VPS.";
+        }
+        catch (Exception ex)
+        {
+            if (showStatus)
+                MessageBox.Show(ex.Message, "License Admin", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _statusLabel.Text = "Could not load VPS licenses.";
+        }
     }
 
     private void CopySelectedKey()
@@ -183,8 +201,15 @@ public sealed class MainForm : Form
         var row = SelectedRow();
         if (row is null)
             return;
-        await _repository.SetLicenseBlockedAsync(row.Id, !row.IsBlocked);
-        await RefreshLicensesAsync();
+        try
+        {
+            await _repository.SetLicenseBlockedAsync(row.Id, !row.IsBlocked);
+            await RefreshLicensesAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "License Admin", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private LicenseGridRow? SelectedRow() =>

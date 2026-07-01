@@ -58,6 +58,34 @@ app.MapPost("/api/licenses/activate", async (LicenseActivationRequest request, A
 app.MapGet("/api/releases/latest", async (string? channel, AdminRepository repo) =>
     Results.Json(await repo.GetLatestReleaseAsync(channel ?? "stable")));
 
+app.MapGet("/api/admin/licenses", async (HttpContext context, AdminRepository repo) =>
+{
+    if (!AdminPasswordMatches(context, app.Configuration))
+        return Results.Unauthorized();
+    return Results.Json(await repo.GetAdminLicensesAsync());
+});
+
+app.MapPost("/api/admin/licenses/create", async (HttpContext context, CreateLicenseRequest request, AdminRepository repo) =>
+{
+    if (!AdminPasswordMatches(context, app.Configuration))
+        return Results.Unauthorized();
+    var license = await repo.CreateLicenseAsync(
+        request.CustomerName,
+        request.CustomerEmail,
+        request.ExpiresUtc,
+        request.MaxActivations,
+        request.Notes);
+    return Results.Json(license);
+});
+
+app.MapPost("/api/admin/licenses/block", async (HttpContext context, SetLicenseBlockedRequest request, AdminRepository repo) =>
+{
+    if (!AdminPasswordMatches(context, app.Configuration))
+        return Results.Unauthorized();
+    await repo.SetLicenseBlockedAsync(request.Id, request.Blocked);
+    return Results.Json(new { success = true });
+});
+
 app.MapGet("/admin/login", () => Results.Content(LoginHtml(), "text/html"));
 app.MapPost("/admin/login", async (HttpContext context) =>
 {
@@ -168,6 +196,18 @@ static async Task<string> Sha256Async(string path)
     await using var stream = File.OpenRead(path);
     var hash = await SHA256.HashDataAsync(stream);
     return Convert.ToHexString(hash).ToLowerInvariant();
+}
+
+static bool AdminPasswordMatches(HttpContext context, IConfiguration configuration)
+{
+    var provided = context.Request.Headers["X-Admin-Password"].ToString();
+    var configured = Environment.GetEnvironmentVariable("CUTTER_ADMIN_PASSWORD")
+                     ?? configuration["AdminPassword"]
+                     ?? "change-me-now";
+    return !string.IsNullOrWhiteSpace(provided) &&
+           CryptographicOperations.FixedTimeEquals(
+               Encoding.UTF8.GetBytes(provided),
+               Encoding.UTF8.GetBytes(configured));
 }
 
 static string LoginHtml(string? error = null) =>

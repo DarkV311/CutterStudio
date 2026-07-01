@@ -11,6 +11,28 @@ public sealed record LicenseRecord(
     bool IsBlocked,
     string Notes);
 
+public sealed record AdminLicenseRecord(
+    long Id,
+    string LicenseKey,
+    string CustomerName,
+    string CustomerEmail,
+    DateTime CreatedUtc,
+    DateTime? ExpiresUtc,
+    int MaxActivations,
+    bool IsBlocked,
+    string Notes,
+    int ActivationsUsed,
+    DateTime? LastSeenUtc);
+
+public sealed record CreateLicenseRequest(
+    string CustomerName,
+    string CustomerEmail,
+    DateTime? ExpiresUtc,
+    int MaxActivations,
+    string Notes);
+
+public sealed record SetLicenseBlockedRequest(long Id, bool Blocked);
+
 public sealed record ActivationRecord(
     long Id,
     long LicenseId,

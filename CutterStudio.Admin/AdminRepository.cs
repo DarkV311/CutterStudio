@@ -84,6 +84,43 @@ public sealed class AdminRepository
         return results;
     }
 
+    public async Task<IReadOnlyList<AdminLicenseRecord>> GetAdminLicensesAsync()
+    {
+        var results = new List<AdminLicenseRecord>();
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT l.id, l.license_key, l.customer_name, l.customer_email, l.created_utc, l.expires_utc,
+                   l.max_activations, l.is_blocked, l.notes,
+                   COUNT(a.id) AS activations_used,
+                   MAX(a.last_seen_utc) AS last_seen_utc
+            FROM licenses l
+            LEFT JOIN activations a ON a.license_id = l.id
+            GROUP BY l.id
+            ORDER BY l.created_utc DESC;
+            """;
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            results.Add(new AdminLicenseRecord(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                DateTime.Parse(reader.GetString(4)).ToUniversalTime(),
+                reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5)).ToUniversalTime(),
+                reader.GetInt32(6),
+                reader.GetInt32(7) == 1,
+                reader.GetString(8),
+                reader.GetInt32(9),
+                reader.IsDBNull(10) ? null : DateTime.Parse(reader.GetString(10)).ToUniversalTime()));
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<ReleaseRecord>> GetReleasesAsync()
     {
         var results = new List<ReleaseRecord>();
