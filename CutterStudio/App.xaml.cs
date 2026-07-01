@@ -41,6 +41,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         try
         {
             await _host.StartAsync();
@@ -61,6 +62,7 @@ public partial class App : Application
 
             MainWindow = _host.Services.GetRequiredService<MainWindow>();
             MainWindow.Show();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             StartLicenseHeartbeat();
         }
         catch (Exception ex)
