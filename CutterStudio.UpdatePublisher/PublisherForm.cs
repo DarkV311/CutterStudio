@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Net;
 using System.Diagnostics;
 using System.Reflection;
@@ -19,9 +20,9 @@ public sealed class PublisherForm : Form
     private readonly TextBox _serverUrlBox = new() { Text = "http://69.169.109.119:5080" };
     private readonly TextBox _serverPasswordBox = new() { UseSystemPasswordChar = true };
     private readonly TextBox _logBox = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill };
-    private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38 };
-    private readonly Button _buildAndPublishButton = new() { Text = "Build + Publish GitHub", Height = 38 };
-    private readonly Button _buildAndServerPublishButton = new() { Text = "Build + Upload to Server", Height = 38 };
+    private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38, Visible = false };
+    private readonly Button _buildAndPublishButton = new() { Text = "Build + Publish GitHub", Height = 38, Visible = false };
+    private readonly Button _buildAndServerPublishButton = new() { Text = "Build + Upload Update", Height = 52, BackColor = Color.FromArgb(48, 183, 163), ForeColor = Color.White };
 
     public PublisherForm()
     {
@@ -49,7 +50,7 @@ public sealed class PublisherForm : Form
         var form = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 390,
+            Height = 330,
             Padding = new Padding(14),
             ColumnCount = 3
         };
@@ -57,26 +58,25 @@ public sealed class PublisherForm : Form
         form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
 
-        AddRow(form, 0, "GitHub owner", _ownerBox);
-        AddRow(form, 1, "Repository", _repoBox);
-        AddRow(form, 2, "Release tag", _tagBox);
-        AddRow(form, 3, "Release title", _titleBox);
-        AddRow(form, 4, "Notes", _notesBox);
-        AddRow(form, 5, "ZIP / EXE file", _assetBox);
-        AddRow(form, 6, "Server URL", _serverUrlBox);
-        AddRow(form, 7, "Admin password", _serverPasswordBox);
+        AddRow(form, 0, "Release tag", _tagBox);
+        AddRow(form, 1, "Release title", _titleBox);
+        AddRow(form, 2, "Notes", _notesBox);
+        AddReadOnlyRow(form, 3, "Generated ZIP", _assetBox);
+        AddRow(form, 4, "Server URL", _serverUrlBox);
+        AddRow(form, 5, "Admin password", _serverPasswordBox);
 
         var browseButton = new Button { Text = "Browse" };
+        browseButton.Visible = false;
         browseButton.Click += (_, _) => BrowseAsset();
-        form.Controls.Add(browseButton, 2, 5);
+        form.Controls.Add(browseButton, 2, 3);
 
         _publishButton.Click += async (_, _) => await PublishAsync();
         _tagBox.TextChanged += (_, _) => SyncVersionFieldsFromTag();
-        form.Controls.Add(_publishButton, 1, 8);
+        form.Controls.Add(_publishButton, 1, 6);
         _buildAndPublishButton.Click += async (_, _) => await BuildAndPublishAsync();
-        form.Controls.Add(_buildAndPublishButton, 2, 8);
+        form.Controls.Add(_buildAndPublishButton, 2, 6);
         _buildAndServerPublishButton.Click += async (_, _) => await BuildAndPublishToServerAsync();
-        form.Controls.Add(_buildAndServerPublishButton, 1, 9);
+        form.Controls.Add(_buildAndServerPublishButton, 1, 7);
         form.SetColumnSpan(_buildAndServerPublishButton, 2);
 
         Controls.Add(_logBox);
@@ -97,6 +97,12 @@ public sealed class PublisherForm : Form
         control.Dock = DockStyle.Fill;
         panel.Controls.Add(control, 1, row);
         panel.SetColumnSpan(control, 2);
+    }
+
+    private static void AddReadOnlyRow(TableLayoutPanel panel, int row, string label, TextBox control)
+    {
+        control.ReadOnly = true;
+        AddRow(panel, row, label, control);
     }
 
     private void BrowseAsset()
@@ -292,7 +298,7 @@ public sealed class PublisherForm : Form
             AllowAutoRedirect = true,
             UseCookies = true
         };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(10) };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(15) };
 
         Log("Logging in to update server...");
         using (var loginContent = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -324,9 +330,23 @@ public sealed class PublisherForm : Form
             throw new InvalidOperationException($"Server upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{body}");
         }
 
-        Log($"Done: {serverUrl}/api/releases/latest?channel=stable");
-        MessageBox.Show(this, "Update uploaded to your server successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        var latest = await client.GetFromJsonAsync<LatestReleaseResponse>($"{serverUrl}/api/releases/latest?channel=stable", JsonOptions());
+        if (latest is null || !latest.Available || !latest.Version.Equals(version, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Upload finished, but the server latest version is not {version}. Check the admin panel.");
+
+        Log($"Done. Server latest version is {latest.Version}.");
+        Log($"Download URL: {serverUrl}{latest.DownloadUrl}");
+        MessageBox.Show(this, $"Update v{latest.Version} uploaded successfully.\n\nClients will see it from the server.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
+
+    private sealed record LatestReleaseResponse(
+        bool Available,
+        string Version,
+        string Channel,
+        string DownloadUrl,
+        string Sha256,
+        string Notes,
+        DateTime CreatedUtc);
 
     private async Task<GitHubRelease> GetOrCreateReleaseAsync(HttpClient client, string owner, string repo, string tag)
     {
