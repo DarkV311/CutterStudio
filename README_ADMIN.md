@@ -1,10 +1,10 @@
 # Cutter Studio Licensing and Updates
 
-This folder now includes three complete executables under `F:\Cutter\dist`:
+This folder now includes three complete executables under `F:\Cutter\release`:
 
-- Main client: `F:\Cutter\dist\CutterStudio\CutterStudio.exe`
-- License/update admin: `F:\Cutter\dist\LicenseAdmin\CutterStudio.Admin.exe`
-- Standalone updater helper: `F:\Cutter\dist\Updater\CutterStudio.Updater.exe`
+- Main client: `F:\Cutter\release\CutterStudio\CutterStudio.exe`
+- License/update admin: `F:\Cutter\release\LicenseAdmin\CutterStudio.Admin.exe`
+- Standalone updater helper: `F:\Cutter\release\Updater\CutterStudio.Updater.exe`
 
 The admin server source is:
 
@@ -16,7 +16,7 @@ The admin server source is:
 ## Run locally
 
 ```powershell
-Set-Location F:\Cutter\dist\LicenseAdmin
+Set-Location F:\Cutter\release\LicenseAdmin
 $env:CUTTER_ADMIN_PASSWORD = "change-this-password"
 $env:ASPNETCORE_URLS = "http://0.0.0.0:5080"
 .\CutterStudio.Admin.exe
@@ -48,7 +48,7 @@ F:\Cutter\Updates
 Run the server on your PC:
 
 ```powershell
-Set-Location F:\Cutter\dist\LicenseAdmin
+Set-Location F:\Cutter\release\LicenseAdmin
 $env:CUTTER_ADMIN_PASSWORD = "change-this-password"
 $env:ASPNETCORE_URLS = "http://0.0.0.0:5080"
 .\CutterStudio.Admin.exe
@@ -84,6 +84,24 @@ Then use:
 
 The main app now shows the license activation window before opening the editor
 when no activated license is saved.
+
+## Build release files
+
+Run this command whenever you want fresh executable copies:
+
+```powershell
+Set-Location F:\Cutter
+.\PublishRelease.ps1
+```
+
+The output goes to:
+
+```text
+F:\Cutter\release\CutterStudio\CutterStudio.exe
+F:\Cutter\release\LicenseAdmin\CutterStudio.Admin.exe
+F:\Cutter\release\Updater\CutterStudio.Updater.exe
+F:\Cutter\release\CutterStudio-win-x64-v1.0.1.zip
+```
 
 ## GitHub Releases updates
 
