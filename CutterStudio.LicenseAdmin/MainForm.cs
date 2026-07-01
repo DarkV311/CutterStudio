@@ -6,7 +6,7 @@ namespace CutterStudio.LicenseAdmin;
 public sealed class MainForm : Form
 {
     private readonly LicenseRepository _repository;
-    private readonly string _serverUrl;
+    private readonly string _apiStatus;
     private readonly BindingList<LicenseGridRow> _rows = [];
     private readonly DataGridView _grid = new() { Dock = DockStyle.Fill, AutoGenerateColumns = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
     private readonly TextBox _nameBox = new() { PlaceholderText = "Customer name" };
@@ -18,10 +18,10 @@ public sealed class MainForm : Form
     private readonly Label _statusLabel = new() { AutoSize = true };
     private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
 
-    public MainForm(LicenseRepository repository, string serverUrl)
+    public MainForm(LicenseRepository repository, string apiStatus)
     {
         _repository = repository;
-        _serverUrl = serverUrl;
+        _apiStatus = apiStatus;
 
         Text = $"Cutter Studio License Admin v{AppVersion()}";
         Width = 1180;
@@ -48,7 +48,7 @@ public sealed class MainForm : Form
         };
         var server = new Label
         {
-            Text = "Activation service is running in the background.",
+            Text = _apiStatus,
             ForeColor = Color.FromArgb(160, 210, 255),
             AutoSize = true,
             Location = new Point(18, 38)

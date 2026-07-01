@@ -13,7 +13,7 @@ namespace CutterStudio.Services;
 public sealed class LicenseUpdateService : ILicenseUpdateService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     public string MachineId { get; } = BuildMachineId();
     public string AppVersion { get; } =

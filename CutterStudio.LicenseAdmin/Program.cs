@@ -19,13 +19,16 @@ internal static class Program
         var repository = new LicenseRepository(appDirectory);
         repository.InitializeAsync().GetAwaiter().GetResult();
 
-        var webHost = StartActivationApi(repository);
-        Application.Run(new MainForm(repository, "http://localhost:5080"));
-        webHost.StopAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
-        webHost.Dispose();
+        var (webHost, apiStatus) = StartActivationApi(repository);
+        Application.Run(new MainForm(repository, apiStatus));
+        if (webHost is not null)
+        {
+            webHost.StopAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+            webHost.Dispose();
+        }
     }
 
-    private static IHost StartActivationApi(LicenseRepository repository)
+    private static (IHost? Host, string StatusText) StartActivationApi(LicenseRepository repository)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -42,7 +45,18 @@ internal static class Program
         app.MapGet("/api/releases/latest", () =>
             Results.Json(new LatestReleaseResponse(false, "", "stable", "", "", "Use GitHub Releases for updates.", DateTime.MinValue)));
 
-        app.Start();
-        return app;
+        try
+        {
+            app.Start();
+            return (app, "Activation service is running in the background.");
+        }
+        catch (IOException ex) when (ex.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, "Warning: activation port 5080 is already in use by another process.");
+        }
+        catch (Exception ex)
+        {
+            return (null, "Warning: activation service could not start: " + ex.Message);
+        }
     }
 }
