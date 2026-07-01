@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using System.Text.Json;
 
 namespace CutterStudio.LicenseAdmin;
 
@@ -15,6 +16,7 @@ public sealed class MainForm : Form
     private readonly DateTimePicker _expiryPicker = new() { Format = DateTimePickerFormat.Short };
     private readonly CheckBox _neverExpiresBox = new() { Text = "No expiry", AutoSize = true };
     private readonly NumericUpDown _maxActivationsBox = new() { Minimum = 1, Maximum = 1000, Value = 1 };
+    private readonly TextBox _publicUrlBox = new() { PlaceholderText = "Public license URL, e.g. https://your-name.ngrok-free.app" };
     private readonly Label _statusLabel = new() { AutoSize = true };
     private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
 
@@ -63,7 +65,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(14),
             ColumnCount = 1,
-            RowCount = 12
+            RowCount = 18
         };
         formPanel.RowStyles.Clear();
         for (var i = 0; i < 12; i++)
@@ -73,11 +75,13 @@ public sealed class MainForm : Form
         var refreshButton = new Button { Text = "Refresh", Height = 32 };
         var copyButton = new Button { Text = "Copy Selected Key", Height = 32 };
         var blockButton = new Button { Text = "Block / Unblock Selected", Height = 32 };
+        var saveClientConfigButton = new Button { Text = "Save Client Public URL Config", Height = 32 };
 
         createButton.Click += async (_, _) => await CreateLicenseAsync();
         refreshButton.Click += async (_, _) => await RefreshLicensesAsync();
         copyButton.Click += (_, _) => CopySelectedKey();
         blockButton.Click += async (_, _) => await ToggleSelectedBlockAsync();
+        saveClientConfigButton.Click += (_, _) => SaveClientConfig();
         _neverExpiresBox.CheckedChanged += (_, _) => _expiryPicker.Enabled = !_neverExpiresBox.Checked;
 
         formPanel.Controls.Add(MakeLabel("Customer name"));
@@ -95,6 +99,9 @@ public sealed class MainForm : Form
         formPanel.Controls.Add(refreshButton);
         formPanel.Controls.Add(copyButton);
         formPanel.Controls.Add(blockButton);
+        formPanel.Controls.Add(MakeLabel("Public URL for customer apps"));
+        formPanel.Controls.Add(_publicUrlBox);
+        formPanel.Controls.Add(saveClientConfigButton);
         formPanel.Controls.Add(_statusLabel);
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Key", DataPropertyName = nameof(LicenseGridRow.Key), Width = 230 });
@@ -182,6 +189,30 @@ public sealed class MainForm : Form
 
     private LicenseGridRow? SelectedRow() =>
         _grid.CurrentRow?.DataBoundItem as LicenseGridRow;
+
+    private void SaveClientConfig()
+    {
+        var publicUrl = _publicUrlBox.Text.Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(publicUrl) ||
+            !Uri.TryCreate(publicUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            MessageBox.Show("Enter a valid public URL first.", "License Admin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var defaultClientDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\CutterStudio"));
+        Directory.CreateDirectory(defaultClientDirectory);
+        var path = Path.Combine(defaultClientDirectory, "license-server.json");
+        var json = JsonSerializer.Serialize(new { licenseServerUrl = publicUrl }, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(path, json);
+        _statusLabel.Text = $"Client config saved: {path}";
+        MessageBox.Show(
+            $"Client config saved.\n\nShip this file with CutterStudio.exe:\n{path}",
+            "License Admin",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+    }
 
     private sealed class LicenseGridRow
     {
