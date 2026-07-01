@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly CheckBox _neverExpiresBox = new() { Text = "No expiry", AutoSize = true };
     private readonly NumericUpDown _maxActivationsBox = new() { Minimum = 1, Maximum = 1000, Value = 1 };
     private readonly Label _statusLabel = new() { AutoSize = true };
+    private readonly System.Windows.Forms.Timer _refreshTimer = new() { Interval = 5000 };
 
     public MainForm(LicenseRepository repository, string serverUrl)
     {
@@ -29,6 +30,8 @@ public sealed class MainForm : Form
 
         BuildUi();
         Load += async (_, _) => await RefreshLicensesAsync();
+        _refreshTimer.Tick += async (_, _) => await RefreshLicensesAsync(false);
+        _refreshTimer.Start();
     }
 
     private void BuildUi()
@@ -44,7 +47,7 @@ public sealed class MainForm : Form
         };
         var server = new Label
         {
-            Text = $"Activation server: {_serverUrl}",
+            Text = "Activation service is running in the background.",
             ForeColor = Color.FromArgb(160, 210, 255),
             AutoSize = true,
             Location = new Point(18, 38)
@@ -98,6 +101,8 @@ public sealed class MainForm : Form
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Email", DataPropertyName = nameof(LicenseGridRow.Email), Width = 170 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Expires", DataPropertyName = nameof(LicenseGridRow.Expires), Width = 110 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Use", DataPropertyName = nameof(LicenseGridRow.Use), Width = 70 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Open now", DataPropertyName = nameof(LicenseGridRow.OpenNow), Width = 85 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Last seen", DataPropertyName = nameof(LicenseGridRow.LastSeen), Width = 145 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Status", DataPropertyName = nameof(LicenseGridRow.Status), Width = 90 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", DataPropertyName = nameof(LicenseGridRow.Notes), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
         _grid.DataSource = _rows;
@@ -143,13 +148,14 @@ public sealed class MainForm : Form
         await RefreshLicensesAsync();
     }
 
-    private async Task RefreshLicensesAsync()
+    private async Task RefreshLicensesAsync(bool showStatus = true)
     {
         _rows.Clear();
         var licenses = await _repository.GetLicensesAsync();
         foreach (var license in licenses)
             _rows.Add(new LicenseGridRow(license));
-        _statusLabel.Text = $"Loaded {licenses.Count} license(s).";
+        if (showStatus)
+            _statusLabel.Text = $"Loaded {licenses.Count} license(s).";
     }
 
     private void CopySelectedKey()
@@ -183,6 +189,10 @@ public sealed class MainForm : Form
             Email = license.CustomerEmail;
             Expires = license.ExpiresUtc?.ToLocalTime().ToString("yyyy-MM-dd") ?? "Never";
             Use = $"{license.ActivationsUsed}/{license.MaxActivations}";
+            OpenNow = license.LastSeenUtc is not null && DateTime.UtcNow - license.LastSeenUtc.Value <= TimeSpan.FromSeconds(75)
+                ? "Yes"
+                : "No";
+            LastSeen = license.LastSeenUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-";
             IsBlocked = license.IsBlocked;
             Status = license.IsBlocked
                 ? "Blocked"
@@ -198,6 +208,8 @@ public sealed class MainForm : Form
         public string Email { get; }
         public string Expires { get; }
         public string Use { get; }
+        public string OpenNow { get; }
+        public string LastSeen { get; }
         public bool IsBlocked { get; }
         public string Status { get; }
         public string Notes { get; }

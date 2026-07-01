@@ -10,7 +10,8 @@ public sealed record LicenseRecord(
     int MaxActivations,
     bool IsBlocked,
     string Notes,
-    int ActivationsUsed);
+    int ActivationsUsed,
+    DateTime? LastSeenUtc);
 
 public sealed record LicenseActivationRequest(
     string LicenseKey,

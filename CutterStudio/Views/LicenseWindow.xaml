@@ -1,7 +1,7 @@
 <Window x:Class="CutterStudio.Views.LicenseWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Cutter Studio License" Width="520" Height="360"
+        Title="Cutter Studio License" Width="520" Height="300"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
     <Grid Margin="22">
         <Grid.RowDefinitions>
@@ -12,14 +12,12 @@
 
         <StackPanel>
             <TextBlock Text="License Required" FontSize="24" FontWeight="SemiBold"/>
-            <TextBlock Text="Enter your license server and license key to activate Cutter Studio."
+            <TextBlock Text="Enter your license key to activate Cutter Studio."
                        Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,18"
                        TextWrapping="Wrap"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1">
-            <TextBlock Text="Server URL" Foreground="{StaticResource MutedTextBrush}"/>
-            <TextBox x:Name="ServerUrlBox"/>
             <TextBlock Text="License Key" Foreground="{StaticResource MutedTextBrush}"/>
             <TextBox x:Name="LicenseKeyBox"/>
             <TextBlock x:Name="StatusText" Text="Not activated"

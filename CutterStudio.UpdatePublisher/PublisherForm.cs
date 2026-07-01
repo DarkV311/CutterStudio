@@ -8,10 +8,10 @@ public sealed class PublisherForm : Form
 {
     private readonly TextBox _ownerBox = new() { Text = "DarkV311" };
     private readonly TextBox _repoBox = new() { Text = "CutterStudio" };
-    private readonly TextBox _tagBox = new() { Text = "v1.0.2" };
-    private readonly TextBox _titleBox = new() { Text = "Cutter Studio v1.0.2" };
+    private readonly TextBox _tagBox = new() { Text = "v1.0.3" };
+    private readonly TextBox _titleBox = new() { Text = "Cutter Studio v1.0.3" };
     private readonly TextBox _notesBox = new() { Text = "Cutter Studio update.", Multiline = true, Height = 70 };
-    private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v1.0.2.zip" };
+    private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v1.0.3.zip" };
     private readonly TextBox _logBox = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill };
     private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38 };
 

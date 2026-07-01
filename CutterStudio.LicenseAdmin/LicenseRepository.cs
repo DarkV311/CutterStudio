@@ -62,7 +62,8 @@ public sealed class LicenseRepository
             """
             SELECT l.id, l.license_key, l.customer_name, l.customer_email, l.created_utc, l.expires_utc,
                    l.max_activations, l.is_blocked, l.notes,
-                   (SELECT COUNT(*) FROM activations a WHERE a.license_id = l.id) AS activations_used
+                   (SELECT COUNT(*) FROM activations a WHERE a.license_id = l.id) AS activations_used,
+                   (SELECT MAX(last_seen_utc) FROM activations a WHERE a.license_id = l.id) AS last_seen_utc
             FROM licenses l
             ORDER BY l.created_utc DESC;
             """;
@@ -99,7 +100,7 @@ public sealed class LicenseRepository
         command.Parameters.AddWithValue("$max", Math.Clamp(maxActivations, 1, 1000));
         command.Parameters.AddWithValue("$notes", notes.Trim());
         var id = Convert.ToInt64(await command.ExecuteScalarAsync());
-        return new LicenseRecord(id, key, customerName, customerEmail, now, expiresUtc, maxActivations, false, notes, 0);
+        return new LicenseRecord(id, key, customerName, customerEmail, now, expiresUtc, maxActivations, false, notes, 0, null);
     }
 
     public async Task SetLicenseBlockedAsync(long id, bool blocked)
@@ -164,7 +165,8 @@ public sealed class LicenseRepository
             """
             SELECT l.id, l.license_key, l.customer_name, l.customer_email, l.created_utc, l.expires_utc,
                    l.max_activations, l.is_blocked, l.notes,
-                   (SELECT COUNT(*) FROM activations a WHERE a.license_id = l.id) AS activations_used
+                   (SELECT COUNT(*) FROM activations a WHERE a.license_id = l.id) AS activations_used,
+                   (SELECT MAX(last_seen_utc) FROM activations a WHERE a.license_id = l.id) AS last_seen_utc
             FROM licenses l WHERE l.license_key = $key;
             """;
         command.Parameters.AddWithValue("$key", key);
@@ -200,7 +202,10 @@ public sealed class LicenseRepository
             reader.GetInt32(6),
             reader.GetInt32(7) == 1,
             reader.GetString(8),
-            reader.GetInt32(9));
+            reader.GetInt32(9),
+            reader.IsDBNull(10)
+                ? null
+                : DateTime.Parse(reader.GetString(10), null, System.Globalization.DateTimeStyles.RoundtripKind));
 
     private static string GenerateLicenseKey()
     {

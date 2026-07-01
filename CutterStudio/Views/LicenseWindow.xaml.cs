@@ -16,7 +16,6 @@ public partial class LicenseWindow : Window
         _settingsService = settingsService;
         _licenseUpdate = licenseUpdate;
         _settings = settingsService.Load();
-        ServerUrlBox.Text = _settings.LicenseServerUrl;
         LicenseKeyBox.Text = _settings.LicenseKey;
         StatusText.Text = _settings.LicenseStatus;
     }
@@ -31,8 +30,9 @@ public partial class LicenseWindow : Window
         StatusText.Text = "Activating...";
         try
         {
-            var result = await _licenseUpdate.ActivateAsync(ServerUrlBox.Text, LicenseKeyBox.Text);
-            _settings.LicenseServerUrl = ServerUrlBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(_settings.LicenseServerUrl))
+                _settings.LicenseServerUrl = "http://localhost:5080";
+            var result = await _licenseUpdate.ActivateAsync(_settings.LicenseServerUrl, LicenseKeyBox.Text);
             _settings.LicenseKey = LicenseKeyBox.Text.Trim();
             _settings.LicenseStatus = result.Valid
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"

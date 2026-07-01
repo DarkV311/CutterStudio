@@ -215,8 +215,6 @@
 
                         <GroupBox Header="Licensing &amp; Updates">
                             <StackPanel>
-                                <TextBlock Text="Server URL" Foreground="{StaticResource MutedTextBrush}"/>
-                                <TextBox Text="{Binding Settings.LicenseServerUrl, UpdateSourceTrigger=LostFocus}"/>
                                 <TextBlock Text="License key" Foreground="{StaticResource MutedTextBrush}"/>
                                 <TextBox Text="{Binding Settings.LicenseKey, UpdateSourceTrigger=LostFocus}"/>
                                 <TextBlock Text="{Binding Settings.LicenseStatus}" Foreground="{StaticResource AccentBrush}"
