@@ -84,11 +84,19 @@ public sealed class LicenseRepository
 
         foreach (var path in candidates)
         {
-            if (!File.Exists(path))
-                continue;
-            var settings = JsonSerializer.Deserialize<RepositorySettings>(File.ReadAllText(path), JsonOptions());
-            if (settings is not null && !string.IsNullOrWhiteSpace(settings.ServerUrl) && !string.IsNullOrWhiteSpace(settings.AdminPassword))
-                return settings;
+            try
+            {
+                if (!File.Exists(path))
+                    continue;
+                var settings = JsonSerializer.Deserialize<RepositorySettings>(File.ReadAllText(path), JsonOptions());
+                if (settings is not null && !string.IsNullOrWhiteSpace(settings.ServerUrl) && !string.IsNullOrWhiteSpace(settings.AdminPassword))
+                    return settings;
+            }
+            catch
+            {
+                // A malformed config file should not make the desktop admin disappear.
+                // Fall back to the local secret file below.
+            }
         }
 
         var passwordFile = @"F:\Cutter\secrets\license-admin-password.txt";
