@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CutterStudio.UpdatePublisher;
 
@@ -123,7 +124,7 @@ public sealed class PublisherForm : Form
             var release = await GetOrCreateReleaseAsync(client, owner, repo, tag);
             var assetName = Path.GetFileName(assetPath);
             await DeleteExistingAssetAsync(client, release, assetName);
-            await UploadAssetAsync(client, release.UploadUrl, assetPath, assetName);
+            await UploadAssetAsync(client, owner, repo, release, assetPath, assetName);
             Log($"Done: https://github.com/{owner}/{repo}/releases/tag/{tag}");
             MessageBox.Show(this, "Update release published successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -228,7 +229,7 @@ public sealed class PublisherForm : Form
         var release = await GetOrCreateReleaseAsync(client, owner, repo, tag);
         var assetName = Path.GetFileName(assetPath);
         await DeleteExistingAssetAsync(client, release, assetName);
-        await UploadAssetAsync(client, release.UploadUrl, assetPath, assetName);
+        await UploadAssetAsync(client, owner, repo, release, assetPath, assetName);
         Log($"Done: https://github.com/{owner}/{repo}/releases/tag/{tag}");
         MessageBox.Show(this, "Update release published successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
@@ -275,10 +276,19 @@ public sealed class PublisherForm : Form
         }
     }
 
-    private async Task UploadAssetAsync(HttpClient client, string uploadUrlTemplate, string path, string assetName)
+    private async Task UploadAssetAsync(
+        HttpClient client,
+        string owner,
+        string repo,
+        GitHubRelease release,
+        string path,
+        string assetName)
     {
         Log("Uploading asset...");
-        var uploadUrl = uploadUrlTemplate.Split('{')[0] + "?name=" + Uri.EscapeDataString(assetName);
+        var uploadBase = !string.IsNullOrWhiteSpace(release.UploadUrl)
+            ? release.UploadUrl.Split('{')[0]
+            : $"https://uploads.github.com/repos/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}/releases/{release.Id}/assets";
+        var uploadUrl = uploadBase + "?name=" + Uri.EscapeDataString(assetName);
         await using var stream = File.OpenRead(path);
         using var content = new StreamContent(stream);
         content.Headers.ContentType = new MediaTypeHeaderValue(Path.GetExtension(path).Equals(".zip", StringComparison.OrdinalIgnoreCase)
@@ -321,6 +331,12 @@ public sealed class PublisherForm : Form
 
     private void Log(string text) => _logBox.AppendText($"[{DateTime.Now:T}] {text}{Environment.NewLine}");
 
-    private sealed record GitHubRelease(string UploadUrl, IReadOnlyList<GitHubAsset>? Assets);
-    private sealed record GitHubAsset(string Name, string Url);
+    private sealed record GitHubRelease(
+        [property: JsonPropertyName("id")] long Id,
+        [property: JsonPropertyName("upload_url")] string? UploadUrl,
+        [property: JsonPropertyName("assets")] IReadOnlyList<GitHubAsset>? Assets);
+
+    private sealed record GitHubAsset(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("url")] string Url);
 }
