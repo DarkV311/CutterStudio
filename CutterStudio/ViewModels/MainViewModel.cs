@@ -1,6 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
+using System.Windows;
 using CutterStudio.Models;
 using CutterStudio.Services;
 
@@ -216,6 +221,7 @@ public sealed class MainViewModel : ObservableObject
         ApplyRememberedDevice();
         await ReloadRecentProjectsAsync();
         StatusText = "Ready";
+        _ = CheckUpdateAsync(true);
     }
 
     public void PersistUserSettings() => _userSettings.Save(Settings);
@@ -491,7 +497,9 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private async Task CheckUpdateAsync()
+    private Task CheckUpdateAsync() => CheckUpdateAsync(false);
+
+    private async Task CheckUpdateAsync(bool automatic)
     {
         IsBusy = true;
         StatusText = "Checking for updates...";
@@ -500,14 +508,16 @@ public sealed class MainViewModel : ObservableObject
             var release = await _licenseUpdate.GetLatestReleaseAsync(Settings);
             if (!release.Available)
             {
-                _dialogs.ShowInfo("No published release was found from the selected update source.", "Updates");
+                if (!automatic)
+                    _dialogs.ShowInfo("No published release was found from the selected update source.", "Updates");
                 StatusText = "No update release found.";
                 return;
             }
 
             if (!_licenseUpdate.IsNewerVersion(release.Version))
             {
-                _dialogs.ShowInfo($"You are already on version {_licenseUpdate.AppVersion}.\nLatest: {release.Version}", "Updates");
+                if (!automatic)
+                    _dialogs.ShowInfo($"You are already on version {_licenseUpdate.AppVersion}.\nLatest: {release.Version}", "Updates");
                 StatusText = "Application is up to date.";
                 return;
             }
@@ -515,18 +525,135 @@ public sealed class MainViewModel : ObservableObject
             var absoluteUrl = _licenseUpdate.ResolveDownloadUrl(release, Settings);
             if (_dialogs.Confirm(
                     $"New version available: {release.Version}\n" +
-                    $"Source: {Settings.UpdateSource}\n\n{release.Notes}\n\nOpen download link?",
+                    $"Current version: {_licenseUpdate.AppVersion}\n" +
+                    $"Source: {Settings.UpdateSource}\n\n{release.Notes}\n\nDownload and install now?",
                     "Update available"))
             {
-                LicenseUpdateService.OpenUrl(absoluteUrl);
+                await DownloadAndInstallUpdateAsync(release, absoluteUrl);
             }
             StatusText = $"Update available: {release.Version}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = automatic ? "Update check skipped." : ex.Message;
+            if (!automatic)
+                _dialogs.ShowError(ex.Message, "Updates");
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    private async Task DownloadAndInstallUpdateAsync(LatestReleaseResponse release, string downloadUrl)
+    {
+        TransferProgress = 0;
+        StatusText = $"Downloading update {release.Version}...";
+
+        var workDirectory = Path.Combine(Path.GetTempPath(), "CutterStudioUpdate", Guid.NewGuid().ToString("N"));
+        var zipPath = Path.Combine(workDirectory, $"CutterStudio-{release.Version}.zip");
+        var extractDirectory = Path.Combine(workDirectory, "extract");
+        Directory.CreateDirectory(workDirectory);
+        Directory.CreateDirectory(extractDirectory);
+
+        await DownloadFileAsync(downloadUrl, zipPath, new Progress<double>(value =>
+        {
+            TransferProgress = value * 85;
+            StatusText = $"Downloading update {release.Version}: {TransferProgress:0}%";
+        }));
+
+        if (!string.IsNullOrWhiteSpace(release.Sha256))
+            await VerifySha256Async(zipPath, release.Sha256);
+
+        StatusText = "Preparing update...";
+        ZipFile.ExtractToDirectory(zipPath, extractDirectory, true);
+
+        var newExe = Directory.GetFiles(extractDirectory, "CutterStudio.exe", SearchOption.AllDirectories)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException("The downloaded update does not contain CutterStudio.exe.");
+        var sourceDirectory = Path.GetDirectoryName(newExe)
+            ?? throw new InvalidOperationException("Could not locate extracted update directory.");
+
+        var installScript = WriteInstallScript(workDirectory, sourceDirectory, AppContext.BaseDirectory);
+        StatusText = "Installing update. Cutter Studio will restart...";
+        TransferProgress = 100;
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-ExecutionPolicy Bypass -File \"{installScript}\" -ProcessId {Environment.ProcessId}",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        await Task.Delay(300);
+        Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown(0));
+    }
+
+    private static async Task DownloadFileAsync(string url, string targetPath, IProgress<double> progress)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        var total = response.Content.Headers.ContentLength;
+        await using var input = await response.Content.ReadAsStreamAsync();
+        await using var output = File.Create(targetPath);
+        var buffer = new byte[1024 * 128];
+        long readTotal = 0;
+        while (true)
+        {
+            var read = await input.ReadAsync(buffer);
+            if (read == 0)
+                break;
+            await output.WriteAsync(buffer.AsMemory(0, read));
+            readTotal += read;
+            if (total is > 0)
+                progress.Report(Math.Clamp(readTotal / (double)total.Value, 0, 1));
+        }
+        progress.Report(1);
+    }
+
+    private static async Task VerifySha256Async(string path, string expectedSha256)
+    {
+        await using var stream = File.OpenRead(path);
+        var hash = await System.Security.Cryptography.SHA256.HashDataAsync(stream);
+        var actual = Convert.ToHexString(hash).ToLowerInvariant();
+        if (!actual.Equals(expectedSha256.Trim().ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Downloaded update checksum did not match.");
+    }
+
+    private static string WriteInstallScript(string workDirectory, string sourceDirectory, string targetDirectory)
+    {
+        var scriptPath = Path.Combine(workDirectory, "InstallCutterStudioUpdate.ps1");
+        var script = $$"""
+param([int]$ProcessId)
+$ErrorActionPreference = "Stop"
+$source = "{{EscapePowerShell(sourceDirectory)}}"
+$target = "{{EscapePowerShell(targetDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))}}"
+try {
+    Wait-Process -Id $ProcessId -Timeout 30 -ErrorAction SilentlyContinue
+} catch {}
+Start-Sleep -Milliseconds 700
+Get-ChildItem -LiteralPath $source -Force | ForEach-Object {
+    if ($_.Name -ieq "license-server.json") {
+        return
+    }
+    $destination = Join-Path $target $_.Name
+    if ($_.PSIsContainer) {
+        Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force
+    } else {
+        Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+    }
+}
+Start-Process -FilePath (Join-Path $target "CutterStudio.exe")
+Start-Sleep -Seconds 2
+try { Remove-Item -LiteralPath "{{EscapePowerShell(workDirectory)}}"" -Recurse -Force } catch {}
+""";
+        File.WriteAllText(scriptPath, script, Encoding.UTF8);
+        return scriptPath;
+    }
+
+    private static string EscapePowerShell(string value) => value.Replace("`", "``").Replace("\"", "`\"");
 
     private void RefreshPorts()
     {
