@@ -1,7 +1,8 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "0.1"
+    [string]$Version = "0.1",
+    [switch]$ClientOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +28,8 @@ $updaterOut = Join-Path $releaseRoot "Updater"
 
 New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
 
-foreach ($path in @($clientOut, $adminOut, $updaterOut)) {
+$pathsToClean = if ($ClientOnly) { @($clientOut) } else { @($clientOut, $adminOut, $updaterOut) }
+foreach ($path in $pathsToClean) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Recurse -Force
     }
@@ -44,26 +46,28 @@ dotnet publish (Join-Path $root "CutterStudio\CutterStudio.csproj") `
     -p:FileVersion=$assemblyVersion `
     -o $clientOut
 
-dotnet publish (Join-Path $root "CutterStudio.LicenseAdmin\CutterStudio.LicenseAdmin.csproj") `
-    -c $Configuration `
-    -r $Runtime `
-    --self-contained true `
-    -p:PublishSingleFile=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
-    -p:Version=$Version `
-    -p:AssemblyVersion=$assemblyVersion `
-    -p:FileVersion=$assemblyVersion `
-    -o $adminOut
+if (-not $ClientOnly) {
+    dotnet publish (Join-Path $root "CutterStudio.LicenseAdmin\CutterStudio.LicenseAdmin.csproj") `
+        -c $Configuration `
+        -r $Runtime `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:Version=$Version `
+        -p:AssemblyVersion=$assemblyVersion `
+        -p:FileVersion=$assemblyVersion `
+        -o $adminOut
 
-dotnet publish (Join-Path $root "CutterStudio.UpdatePublisher\CutterStudio.UpdatePublisher.csproj") `
-    -c $Configuration `
-    -r $Runtime `
-    --self-contained true `
-    -p:PublishSingleFile=true `
-    -p:Version=$Version `
-    -p:AssemblyVersion=$assemblyVersion `
-    -p:FileVersion=$assemblyVersion `
-    -o $updaterOut
+    dotnet publish (Join-Path $root "CutterStudio.UpdatePublisher\CutterStudio.UpdatePublisher.csproj") `
+        -c $Configuration `
+        -r $Runtime `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:Version=$Version `
+        -p:AssemblyVersion=$assemblyVersion `
+        -p:FileVersion=$assemblyVersion `
+        -o $updaterOut
+}
 
 $clientZip = Join-Path $releaseRoot "CutterStudio-win-x64-v$Version.zip"
 if (Test-Path -LiteralPath $clientZip) {
@@ -75,6 +79,8 @@ Write-Host ""
 Write-Host "Release output is ready:"
 Write-Host "  Version: $Version"
 Write-Host "  Client:  $clientOut\CutterStudio.exe"
-Write-Host "  Admin:   $adminOut\CutterStudio.Admin.exe"
-Write-Host "  Updater: $updaterOut\CutterStudio.Updater.exe"
+if (-not $ClientOnly) {
+    Write-Host "  Admin:   $adminOut\CutterStudio.Admin.exe"
+    Write-Host "  Updater: $updaterOut\CutterStudio.Updater.exe"
+}
 Write-Host "  ZIP:     $clientZip"

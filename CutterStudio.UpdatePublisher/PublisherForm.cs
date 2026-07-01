@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -15,6 +16,7 @@ public sealed class PublisherForm : Form
     private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v0.1.zip" };
     private readonly TextBox _logBox = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill };
     private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38 };
+    private readonly Button _buildAndPublishButton = new() { Text = "Build Client ZIP and Publish", Height = 38 };
 
     public PublisherForm()
     {
@@ -63,6 +65,8 @@ public sealed class PublisherForm : Form
         _publishButton.Click += async (_, _) => await PublishAsync();
         _tagBox.TextChanged += (_, _) => SyncVersionFieldsFromTag();
         form.Controls.Add(_publishButton, 1, 6);
+        _buildAndPublishButton.Click += async (_, _) => await BuildAndPublishAsync();
+        form.Controls.Add(_buildAndPublishButton, 2, 6);
 
         Controls.Add(_logBox);
         Controls.Add(form);
@@ -98,6 +102,7 @@ public sealed class PublisherForm : Form
     private async Task PublishAsync()
     {
         _publishButton.Enabled = false;
+        _buildAndPublishButton.Enabled = false;
         try
         {
             var owner = Required(_ownerBox.Text, "GitHub owner");
@@ -130,7 +135,102 @@ public sealed class PublisherForm : Form
         finally
         {
             _publishButton.Enabled = true;
+            _buildAndPublishButton.Enabled = true;
         }
+    }
+
+    private async Task BuildAndPublishAsync()
+    {
+        _publishButton.Enabled = false;
+        _buildAndPublishButton.Enabled = false;
+        try
+        {
+            var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
+            var version = tag[1..];
+            Log($"Building client release {version}...");
+            await RunPublishScriptAsync(version);
+            _assetBox.Text = $@"F:\Cutter\release\CutterStudio-win-x64-v{version}.zip";
+            Log("Build finished. Publishing to GitHub...");
+            await PublishCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            Log("ERROR: " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _publishButton.Enabled = true;
+            _buildAndPublishButton.Enabled = true;
+        }
+    }
+
+    private async Task RunPublishScriptAsync(string version)
+    {
+        var root = FindProjectRoot();
+        var script = Path.Combine(root, "PublishRelease.ps1");
+        if (!File.Exists(script))
+            throw new FileNotFoundException("PublishRelease.ps1 was not found.", script);
+
+        var start = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-ExecutionPolicy Bypass -File \"{script}\" -Version {version} -ClientOnly",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(start)
+            ?? throw new InvalidOperationException("Could not start publish script.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
+        if (!string.IsNullOrWhiteSpace(output))
+            Log(output.Trim());
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "Build failed." : error.Trim());
+    }
+
+    private static string FindProjectRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "PublishRelease.ps1")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+        return @"F:\Cutter";
+    }
+
+    private async Task PublishCoreAsync()
+    {
+        var owner = Required(_ownerBox.Text, "GitHub owner");
+        var repo = Required(_repoBox.Text, "Repository");
+        var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
+        var assetPath = Required(_assetBox.Text, "Release file");
+        if (!File.Exists(assetPath))
+            throw new FileNotFoundException("Release file was not found.", assetPath);
+
+        Log("Reading GitHub credential from Git Credential Manager...");
+        var token = await GitCredentialReader.GetGitHubTokenAsync();
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("CutterStudio-UpdatePublisher");
+        client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+
+        var release = await GetOrCreateReleaseAsync(client, owner, repo, tag);
+        var assetName = Path.GetFileName(assetPath);
+        await DeleteExistingAssetAsync(client, release, assetName);
+        await UploadAssetAsync(client, release.UploadUrl, assetPath, assetName);
+        Log($"Done: https://github.com/{owner}/{repo}/releases/tag/{tag}");
+        MessageBox.Show(this, "Update release published successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task<GitHubRelease> GetOrCreateReleaseAsync(HttpClient client, string owner, string repo, string tag)
