@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Reflection;
 
 namespace CutterStudio.LicenseAdmin;
 
@@ -22,7 +23,7 @@ public sealed class MainForm : Form
         _repository = repository;
         _serverUrl = serverUrl;
 
-        Text = "Cutter Studio License Admin";
+        Text = $"Cutter Studio License Admin v{AppVersion()}";
         Width = 1180;
         Height = 720;
         MinimumSize = new Size(980, 600);
@@ -39,7 +40,7 @@ public sealed class MainForm : Form
         var header = new Panel { Dock = DockStyle.Top, Height = 64, Padding = new Padding(14), BackColor = Color.FromArgb(22, 25, 32) };
         var title = new Label
         {
-            Text = "Cutter Studio License Admin",
+            Text = $"Cutter Studio License Admin v{AppVersion()}",
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 15, FontStyle.Bold),
             AutoSize = true,
@@ -120,6 +121,9 @@ public sealed class MainForm : Form
         Margin = new Padding(0, 8, 0, 2),
         Font = new Font("Segoe UI", 9, FontStyle.Bold)
     };
+
+    private static string AppVersion() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(2) ?? "0.1";
 
     private async Task CreateLicenseAsync()
     {

@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -8,16 +9,16 @@ public sealed class PublisherForm : Form
 {
     private readonly TextBox _ownerBox = new() { Text = "DarkV311" };
     private readonly TextBox _repoBox = new() { Text = "CutterStudio" };
-    private readonly TextBox _tagBox = new() { Text = "v1.0.3" };
-    private readonly TextBox _titleBox = new() { Text = "Cutter Studio v1.0.3" };
+    private readonly TextBox _tagBox = new() { Text = "v0.1" };
+    private readonly TextBox _titleBox = new() { Text = "Cutter Studio v0.1" };
     private readonly TextBox _notesBox = new() { Text = "Cutter Studio update.", Multiline = true, Height = 70 };
-    private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v1.0.3.zip" };
+    private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v0.1.zip" };
     private readonly TextBox _logBox = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill };
     private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38 };
 
     public PublisherForm()
     {
-        Text = "Cutter Studio Update Publisher";
+        Text = $"Cutter Studio Update Publisher v{AppVersion()}";
         Width = 860;
         Height = 650;
         StartPosition = FormStartPosition.CenterScreen;
@@ -30,7 +31,7 @@ public sealed class PublisherForm : Form
         var header = new Panel { Dock = DockStyle.Top, Height = 60, Padding = new Padding(14), BackColor = Color.FromArgb(22, 25, 32) };
         header.Controls.Add(new Label
         {
-            Text = "Cutter Studio Update Publisher",
+            Text = $"Cutter Studio Update Publisher v{AppVersion()}",
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 15, FontStyle.Bold),
             AutoSize = true,
@@ -60,6 +61,7 @@ public sealed class PublisherForm : Form
         form.Controls.Add(browseButton, 2, 5);
 
         _publishButton.Click += async (_, _) => await PublishAsync();
+        _tagBox.TextChanged += (_, _) => SyncVersionFieldsFromTag();
         form.Controls.Add(_publishButton, 1, 6);
 
         Controls.Add(_logBox);
@@ -100,7 +102,7 @@ public sealed class PublisherForm : Form
         {
             var owner = Required(_ownerBox.Text, "GitHub owner");
             var repo = Required(_repoBox.Text, "Repository");
-            var tag = Required(_tagBox.Text, "Release tag");
+            var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
             var assetPath = Required(_assetBox.Text, "Release file");
             if (!File.Exists(assetPath))
                 throw new FileNotFoundException("Release file was not found.", assetPath);
@@ -163,7 +165,7 @@ public sealed class PublisherForm : Form
 
     private async Task DeleteExistingAssetAsync(HttpClient client, GitHubRelease release, string assetName)
     {
-        foreach (var asset in release.Assets)
+        foreach (var asset in release.Assets ?? Array.Empty<GitHubAsset>())
         {
             if (!asset.Name.Equals(assetName, StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -183,8 +185,30 @@ public sealed class PublisherForm : Form
             ? "application/zip"
             : "application/octet-stream");
         var response = await client.PostAsync(uploadUrl, content);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"GitHub upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{body}");
+        }
     }
+
+    private void SyncVersionFieldsFromTag()
+    {
+        var tag = NormalizeTag(_tagBox.Text);
+        if (string.IsNullOrWhiteSpace(tag) || tag == "v")
+            return;
+        _titleBox.Text = $"Cutter Studio {tag}";
+        _assetBox.Text = $@"F:\Cutter\release\CutterStudio-win-x64-{tag}.zip";
+    }
+
+    private static string NormalizeTag(string value)
+    {
+        var tag = value.Trim();
+        return tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? "v" + tag[1..] : "v" + tag;
+    }
+
+    private static string AppVersion() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(2) ?? "0.1";
 
     private static JsonSerializerOptions JsonOptions() => new(JsonSerializerDefaults.Web);
 
@@ -197,6 +221,6 @@ public sealed class PublisherForm : Form
 
     private void Log(string text) => _logBox.AppendText($"[{DateTime.Now:T}] {text}{Environment.NewLine}");
 
-    private sealed record GitHubRelease(string UploadUrl, IReadOnlyList<GitHubAsset> Assets);
+    private sealed record GitHubRelease(string UploadUrl, IReadOnlyList<GitHubAsset>? Assets);
     private sealed record GitHubAsset(string Name, string Url);
 }

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Reflection;
 using CutterStudio.Controls;
 using CutterStudio.ViewModels;
 
@@ -15,9 +16,13 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
+        Title = $"Cutter Studio v{AppVersion()}";
         Loaded += MainWindow_Loaded;
         Closing += (_, _) => _viewModel.PersistUserSettings();
     }
+
+    private static string AppVersion() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(2) ?? "0.1";
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
