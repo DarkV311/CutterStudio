@@ -9,11 +9,13 @@ dist/
 publish/
 Updates/
 release/
+server-publish/
 *.zip
 *.msi
 
 # Local databases / runtime data
 App_Data/
+secrets/
 *.db
 *.db-shm
 *.db-wal
