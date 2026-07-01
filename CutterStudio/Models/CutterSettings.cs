@@ -43,9 +43,9 @@ public sealed class CutterSettings : ObservableObject
     private string _licenseServerUrl = "http://localhost:5080";
     private string _licenseKey = "";
     private string _licenseStatus = "Not activated";
-    private UpdateSourceKind _updateSource = UpdateSourceKind.LocalServer;
-    private string _githubOwner = "";
-    private string _githubRepo = "";
+    private UpdateSourceKind _updateSource = UpdateSourceKind.GitHubReleases;
+    private string _githubOwner = "DarkV311";
+    private string _githubRepo = "CutterStudio";
     private string _directManifestUrl = "";
 
     public string? PortName { get => _portName; set => SetProperty(ref _portName, value); }

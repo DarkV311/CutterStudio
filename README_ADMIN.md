@@ -99,7 +99,7 @@ In Cutter Studio, open `Licensing & Updates` and set:
 
 ```text
 Update source: GitHubReleases
-GitHub owner: your GitHub username or organization
+GitHub owner: DarkV311
 GitHub repo: CutterStudio
 ```
 
