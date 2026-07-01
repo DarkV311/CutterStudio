@@ -1,8 +1,8 @@
-param(
+﻿param(
     [string]$HostName = "69.169.109.119",
     [string]$UserName = "root",
     [string]$PasswordFile = "F:\Cutter\secrets\vps-root-password.txt",
-    [string]$HostKey = "ssh-ed25519 255 SHA256:AA2DpCO3idVBG8/FsWb7m6FEA9G34G9Hz0CHRFUrSlQ",
+    [string]$HostKey = "ssh-ed25519 255 SHA256:eR08OKKhkbkTDHzKOks/9e8XbISTXy/Sm+kYXvzeeso",
     [string]$PublishDir = "F:\Cutter\server-publish\LicenseServer",
     [string]$RemoteDir = "/opt/cutter/license-server",
     [string]$AdminPasswordFile = "F:\Cutter\secrets\license-admin-password.txt"
@@ -86,3 +86,4 @@ Write-Host "Done."
 Write-Host "Admin URL: http://$HostName`:5080/admin"
 Write-Host "Client config updated: $clientConfigPath"
 Write-Host "Admin password file: $AdminPasswordFile"
+

@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
@@ -15,9 +16,12 @@ public sealed class PublisherForm : Form
     private readonly TextBox _titleBox = new() { Text = "Cutter Studio v0.1" };
     private readonly TextBox _notesBox = new() { Text = "Cutter Studio update.", Multiline = true, Height = 70 };
     private readonly TextBox _assetBox = new() { Text = @"F:\Cutter\release\CutterStudio-win-x64-v0.1.zip" };
+    private readonly TextBox _serverUrlBox = new() { Text = "http://69.169.109.119:5080" };
+    private readonly TextBox _serverPasswordBox = new() { UseSystemPasswordChar = true };
     private readonly TextBox _logBox = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill };
     private readonly Button _publishButton = new() { Text = "Publish / Replace GitHub Release", Height = 38 };
-    private readonly Button _buildAndPublishButton = new() { Text = "Build Client ZIP and Publish", Height = 38 };
+    private readonly Button _buildAndPublishButton = new() { Text = "Build + Publish GitHub", Height = 38 };
+    private readonly Button _buildAndServerPublishButton = new() { Text = "Build + Upload to Server", Height = 38 };
 
     public PublisherForm()
     {
@@ -26,6 +30,7 @@ public sealed class PublisherForm : Form
         Height = 650;
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(760, 560);
+        _serverPasswordBox.Text = TryReadText(@"F:\Cutter\secrets\license-admin-password.txt");
         BuildUi();
     }
 
@@ -44,7 +49,7 @@ public sealed class PublisherForm : Form
         var form = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 300,
+            Height = 390,
             Padding = new Padding(14),
             ColumnCount = 3
         };
@@ -58,6 +63,8 @@ public sealed class PublisherForm : Form
         AddRow(form, 3, "Release title", _titleBox);
         AddRow(form, 4, "Notes", _notesBox);
         AddRow(form, 5, "ZIP / EXE file", _assetBox);
+        AddRow(form, 6, "Server URL", _serverUrlBox);
+        AddRow(form, 7, "Admin password", _serverPasswordBox);
 
         var browseButton = new Button { Text = "Browse" };
         browseButton.Click += (_, _) => BrowseAsset();
@@ -65,9 +72,12 @@ public sealed class PublisherForm : Form
 
         _publishButton.Click += async (_, _) => await PublishAsync();
         _tagBox.TextChanged += (_, _) => SyncVersionFieldsFromTag();
-        form.Controls.Add(_publishButton, 1, 6);
+        form.Controls.Add(_publishButton, 1, 8);
         _buildAndPublishButton.Click += async (_, _) => await BuildAndPublishAsync();
-        form.Controls.Add(_buildAndPublishButton, 2, 6);
+        form.Controls.Add(_buildAndPublishButton, 2, 8);
+        _buildAndServerPublishButton.Click += async (_, _) => await BuildAndPublishToServerAsync();
+        form.Controls.Add(_buildAndServerPublishButton, 1, 9);
+        form.SetColumnSpan(_buildAndServerPublishButton, 2);
 
         Controls.Add(_logBox);
         Controls.Add(form);
@@ -104,6 +114,7 @@ public sealed class PublisherForm : Form
     {
         _publishButton.Enabled = false;
         _buildAndPublishButton.Enabled = false;
+        _buildAndServerPublishButton.Enabled = false;
         try
         {
             var owner = Required(_ownerBox.Text, "GitHub owner");
@@ -137,6 +148,7 @@ public sealed class PublisherForm : Form
         {
             _publishButton.Enabled = true;
             _buildAndPublishButton.Enabled = true;
+            _buildAndServerPublishButton.Enabled = true;
         }
     }
 
@@ -144,6 +156,7 @@ public sealed class PublisherForm : Form
     {
         _publishButton.Enabled = false;
         _buildAndPublishButton.Enabled = false;
+        _buildAndServerPublishButton.Enabled = false;
         try
         {
             var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
@@ -163,6 +176,35 @@ public sealed class PublisherForm : Form
         {
             _publishButton.Enabled = true;
             _buildAndPublishButton.Enabled = true;
+            _buildAndServerPublishButton.Enabled = true;
+        }
+    }
+
+    private async Task BuildAndPublishToServerAsync()
+    {
+        _publishButton.Enabled = false;
+        _buildAndPublishButton.Enabled = false;
+        _buildAndServerPublishButton.Enabled = false;
+        try
+        {
+            var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
+            var version = tag[1..];
+            Log($"Building client release {version}...");
+            await RunPublishScriptAsync(version);
+            _assetBox.Text = $@"F:\Cutter\release\CutterStudio-win-x64-v{version}.zip";
+            Log("Build finished. Uploading to license/update server...");
+            await PublishToServerCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            Log("ERROR: " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _publishButton.Enabled = true;
+            _buildAndPublishButton.Enabled = true;
+            _buildAndServerPublishButton.Enabled = true;
         }
     }
 
@@ -232,6 +274,58 @@ public sealed class PublisherForm : Form
         await UploadAssetAsync(client, owner, repo, release, assetPath, assetName);
         Log($"Done: https://github.com/{owner}/{repo}/releases/tag/{tag}");
         MessageBox.Show(this, "Update release published successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private async Task PublishToServerCoreAsync()
+    {
+        var serverUrl = Required(_serverUrlBox.Text, "Server URL").TrimEnd('/');
+        var adminPassword = Required(_serverPasswordBox.Text, "Admin password");
+        var tag = NormalizeTag(Required(_tagBox.Text, "Release tag"));
+        var version = tag[1..];
+        var assetPath = Required(_assetBox.Text, "Release file");
+        if (!File.Exists(assetPath))
+            throw new FileNotFoundException("Release file was not found.", assetPath);
+
+        using var handler = new HttpClientHandler
+        {
+            CookieContainer = new CookieContainer(),
+            AllowAutoRedirect = true,
+            UseCookies = true
+        };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(10) };
+
+        Log("Logging in to update server...");
+        using (var loginContent = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["password"] = adminPassword
+        }))
+        {
+            var login = await client.PostAsync($"{serverUrl}/admin/login", loginContent);
+            login.EnsureSuccessStatusCode();
+        }
+
+        Log("Uploading release ZIP to server...");
+        await using var stream = File.OpenRead(assetPath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(version), "version" },
+            { new StringContent("stable"), "channel" },
+            { new StringContent(_notesBox.Text), "notes" },
+            { new StringContent("on"), "published" },
+            { fileContent, "releaseFile", Path.GetFileName(assetPath) }
+        };
+
+        var response = await client.PostAsync($"{serverUrl}/admin/releases/create", form);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Server upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{body}");
+        }
+
+        Log($"Done: {serverUrl}/api/releases/latest?channel=stable");
+        MessageBox.Show(this, "Update uploaded to your server successfully.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task<GitHubRelease> GetOrCreateReleaseAsync(HttpClient client, string owner, string repo, string tag)
@@ -330,6 +424,18 @@ public sealed class PublisherForm : Form
     }
 
     private void Log(string text) => _logBox.AppendText($"[{DateTime.Now:T}] {text}{Environment.NewLine}");
+
+    private static string TryReadText(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
 
     private sealed record GitHubRelease(
         [property: JsonPropertyName("id")] long Id,

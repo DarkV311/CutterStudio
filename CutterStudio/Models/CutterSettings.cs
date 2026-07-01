@@ -45,7 +45,7 @@ public sealed class CutterSettings : ObservableObject
     private string _licenseStatus = "Not activated";
     private DateTime? _licenseExpiresUtc;
     private DateTime? _licenseLastCheckedUtc;
-    private UpdateSourceKind _updateSource = UpdateSourceKind.GitHubReleases;
+    private UpdateSourceKind _updateSource = UpdateSourceKind.LocalServer;
     private string _githubOwner = "DarkV311";
     private string _githubRepo = "CutterStudio";
     private string _directManifestUrl = "";
