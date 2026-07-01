@@ -13,8 +13,7 @@ public sealed class MainForm : Form
     private readonly TextBox _nameBox = new() { PlaceholderText = "Customer name" };
     private readonly TextBox _emailBox = new() { PlaceholderText = "Customer email" };
     private readonly TextBox _notesBox = new() { PlaceholderText = "Notes", Multiline = true, Height = 56 };
-    private readonly DateTimePicker _expiryPicker = new() { Format = DateTimePickerFormat.Short };
-    private readonly CheckBox _neverExpiresBox = new() { Text = "No expiry", AutoSize = true };
+    private readonly NumericUpDown _durationDaysBox = new() { Minimum = 0, Maximum = 36500, Value = 0 };
     private readonly NumericUpDown _maxActivationsBox = new() { Minimum = 1, Maximum = 1000, Value = 1 };
     private readonly TextBox _publicUrlBox = new() { PlaceholderText = "Public license URL, e.g. https://your-name.ngrok-free.app" };
     private readonly Label _statusLabel = new() { AutoSize = true };
@@ -83,15 +82,12 @@ public sealed class MainForm : Form
         copyButton.Click += (_, _) => CopySelectedKey();
         blockButton.Click += async (_, _) => await ToggleSelectedBlockAsync();
         saveClientConfigButton.Click += (_, _) => SaveClientConfig();
-        _neverExpiresBox.CheckedChanged += (_, _) => _expiryPicker.Enabled = !_neverExpiresBox.Checked;
-
         formPanel.Controls.Add(MakeLabel("Customer name"));
         formPanel.Controls.Add(_nameBox);
         formPanel.Controls.Add(MakeLabel("Customer email"));
         formPanel.Controls.Add(_emailBox);
-        formPanel.Controls.Add(MakeLabel("Expiry date"));
-        formPanel.Controls.Add(_expiryPicker);
-        formPanel.Controls.Add(_neverExpiresBox);
+        formPanel.Controls.Add(MakeLabel("License days (0 = permanent)"));
+        formPanel.Controls.Add(_durationDaysBox);
         formPanel.Controls.Add(MakeLabel("Max activations"));
         formPanel.Controls.Add(_maxActivationsBox);
         formPanel.Controls.Add(MakeLabel("Notes"));
@@ -141,16 +137,14 @@ public sealed class MainForm : Form
             return;
         }
 
-        DateTime? expiry = _neverExpiresBox.Checked
-            ? null
-            : DateTime.SpecifyKind(_expiryPicker.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime();
+        var durationDays = (int)_durationDaysBox.Value;
 
         try
         {
             var license = await _repository.CreateLicenseAsync(
                 _nameBox.Text,
                 _emailBox.Text,
-                expiry,
+                durationDays,
                 (int)_maxActivationsBox.Value,
                 _notesBox.Text);
 

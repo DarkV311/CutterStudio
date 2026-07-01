@@ -38,6 +38,8 @@ public partial class LicenseWindow : Window
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
             _settings.LicenseExpiresUtc = result.ExpiresUtc;
+            _settings.LicenseCustomerName = result.CustomerName;
+            _settings.LicenseType = result.LicenseType;
             _settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             _settingsService.Save(_settings);
 

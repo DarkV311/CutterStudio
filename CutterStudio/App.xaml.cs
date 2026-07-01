@@ -107,6 +107,8 @@ public partial class App : Application
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
             settings.LicenseExpiresUtc = result.ExpiresUtc;
+            settings.LicenseCustomerName = result.CustomerName;
+            settings.LicenseType = result.LicenseType;
             settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             _settingsService.Save(settings);
 
@@ -142,6 +144,8 @@ public partial class App : Application
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
             settings.LicenseExpiresUtc = result.ExpiresUtc;
+            settings.LicenseCustomerName = result.CustomerName;
+            settings.LicenseType = result.LicenseType;
             settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             settingsService.Save(settings);
             return result.Valid;

@@ -11,7 +11,9 @@ public sealed record LicenseActivationResponse(
     DateTime? ExpiresUtc,
     int ActivationsUsed,
     int MaxActivations,
-    string Message);
+    string Message,
+    string CustomerName = "",
+    string LicenseType = "");
 
 public sealed record LatestReleaseResponse(
     bool Available,

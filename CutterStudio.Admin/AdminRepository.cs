@@ -246,14 +246,14 @@ public sealed class AdminRepository
         if (license is null)
             return new LicenseActivationResponse(false, "not_found", null, 0, 0, "License key was not found.");
         if (license.IsBlocked)
-            return new LicenseActivationResponse(false, "blocked", license.ExpiresUtc, 0, license.MaxActivations, "License is blocked.");
+            return new LicenseActivationResponse(false, "blocked", license.ExpiresUtc, 0, license.MaxActivations, "License is blocked.", license.CustomerName, LicenseType(license.ExpiresUtc));
         if (license.ExpiresUtc is not null && license.ExpiresUtc.Value < DateTime.UtcNow)
-            return new LicenseActivationResponse(false, "expired", license.ExpiresUtc, 0, license.MaxActivations, "License is expired.");
+            return new LicenseActivationResponse(false, "expired", license.ExpiresUtc, 0, license.MaxActivations, "License is expired.", license.CustomerName, LicenseType(license.ExpiresUtc));
 
         var used = await CountActivationsAsync(connection, license.Id);
         var exists = await ActivationExistsAsync(connection, license.Id, request.MachineId);
         if (!exists && used >= license.MaxActivations)
-            return new LicenseActivationResponse(false, "activation_limit", license.ExpiresUtc, used, license.MaxActivations, "Activation limit reached.");
+            return new LicenseActivationResponse(false, "activation_limit", license.ExpiresUtc, used, license.MaxActivations, "Activation limit reached.", license.CustomerName, LicenseType(license.ExpiresUtc));
 
         var now = DateTime.UtcNow;
         await using var command = connection.CreateCommand();
@@ -274,7 +274,7 @@ public sealed class AdminRepository
         await transaction.CommitAsync();
 
         used = await CountActivationsAsync(connection, license.Id);
-        return new LicenseActivationResponse(true, "active", license.ExpiresUtc, used, license.MaxActivations, "License is active.");
+        return new LicenseActivationResponse(true, "active", license.ExpiresUtc, used, license.MaxActivations, "License is active.", license.CustomerName, LicenseType(license.ExpiresUtc));
     }
 
     private async Task<LicenseRecord?> FindLicenseAsync(SqliteConnection connection, string key)
@@ -339,4 +339,7 @@ public sealed class AdminRepository
         var token = Convert.ToHexString(bytes);
         return $"CUT-{token[..4]}-{token[4..8]}-{token[8..12]}-{token[12..16]}-{token[16..24]}";
     }
+
+    private static string LicenseType(DateTime? expiresUtc) =>
+        expiresUtc is null ? "Permanent" : $"Expires {expiresUtc.Value.ToLocalTime():yyyy-MM-dd}";
 }

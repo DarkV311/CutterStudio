@@ -27,6 +27,7 @@ public sealed record AdminLicenseRecord(
 public sealed record CreateLicenseRequest(
     string CustomerName,
     string CustomerEmail,
+    int DurationDays,
     DateTime? ExpiresUtc,
     int MaxActivations,
     string Notes);
@@ -63,7 +64,9 @@ public sealed record LicenseActivationResponse(
     DateTime? ExpiresUtc,
     int ActivationsUsed,
     int MaxActivations,
-    string Message);
+    string Message,
+    string CustomerName = "",
+    string LicenseType = "");
 
 public sealed record LatestReleaseResponse(
     bool Available,

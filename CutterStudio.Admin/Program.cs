@@ -69,10 +69,13 @@ app.MapPost("/api/admin/licenses/create", async (HttpContext context, CreateLice
 {
     if (!AdminPasswordMatches(context, app.Configuration))
         return Results.Unauthorized();
+    var expiresUtc = request.DurationDays <= 0
+        ? request.ExpiresUtc
+        : DateTime.UtcNow.Date.AddDays(request.DurationDays + 1).AddTicks(-1);
     var license = await repo.CreateLicenseAsync(
         request.CustomerName,
         request.CustomerEmail,
-        request.ExpiresUtc,
+        expiresUtc,
         request.MaxActivations,
         request.Notes);
     return Results.Json(license);

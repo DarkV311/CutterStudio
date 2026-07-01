@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -109,6 +110,22 @@ public sealed class MainViewModel : ObservableObject
         [RegistrationMarkStyle.SquareCorners, RegistrationMarkStyle.CircleCross];
     public IReadOnlyList<UpdateSourceKind> UpdateSources { get; } =
         [UpdateSourceKind.LocalServer, UpdateSourceKind.GitHubReleases, UpdateSourceKind.DirectManifest];
+
+    public string WindowTitle
+    {
+        get
+        {
+            var customer = string.IsNullOrWhiteSpace(Settings.LicenseCustomerName)
+                ? "Unknown user"
+                : Settings.LicenseCustomerName.Trim();
+            var licenseType = string.IsNullOrWhiteSpace(Settings.LicenseType)
+                ? Settings.LicenseExpiresUtc is null
+                    ? "Permanent"
+                    : $"Expires {Settings.LicenseExpiresUtc.Value.ToLocalTime():yyyy-MM-dd}"
+                : Settings.LicenseType.Trim();
+            return $"Cutter Studio v{AppVersion()} - {customer} - {licenseType}";
+        }
+    }
 
     public AsyncRelayCommand PasteCommand { get; }
     public AsyncRelayCommand ImportCommand { get; }
@@ -486,6 +503,8 @@ public sealed class MainViewModel : ObservableObject
                 ? $"Active ({result.ActivationsUsed}/{result.MaxActivations})"
                 : $"Invalid: {result.Status}";
             Settings.LicenseExpiresUtc = result.ExpiresUtc;
+            Settings.LicenseCustomerName = result.CustomerName;
+            Settings.LicenseType = result.LicenseType;
             Settings.LicenseLastCheckedUtc = DateTime.UtcNow;
             PersistUserSettings();
             _dialogs.ShowInfo(result.Message, "License");
@@ -655,6 +674,9 @@ try { Remove-Item -LiteralPath "{{EscapePowerShell(workDirectory)}}"" -Recurse -
 
     private static string EscapePowerShell(string value) => value.Replace("`", "``").Replace("\"", "`\"");
 
+    private static string AppVersion() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(2) ?? "0.1";
+
     private void RefreshPorts()
     {
         var selected = Settings.PortName;
@@ -695,6 +717,12 @@ try { Remove-Item -LiteralPath "{{EscapePowerShell(workDirectory)}}"" -Recurse -
         if (e.PropertyName == nameof(CutterSettings.CutterProfile) && !_applyingProfile)
         {
             ApplyProfile(_profiles.Get(Settings.CutterProfile));
+        }
+        if (e.PropertyName is nameof(CutterSettings.LicenseCustomerName)
+            or nameof(CutterSettings.LicenseType)
+            or nameof(CutterSettings.LicenseExpiresUtc))
+        {
+            OnPropertyChanged(nameof(WindowTitle));
         }
         UpdateEstimate();
         UpdatePreview();

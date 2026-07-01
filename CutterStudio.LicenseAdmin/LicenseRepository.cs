@@ -34,7 +34,7 @@ public sealed class LicenseRepository
     public async Task<LicenseRecord> CreateLicenseAsync(
         string customerName,
         string customerEmail,
-        DateTime? expiresUtc,
+        int durationDays,
         int maxActivations,
         string notes)
     {
@@ -42,7 +42,8 @@ public sealed class LicenseRepository
         {
             customerName,
             customerEmail,
-            expiresUtc,
+            durationDays,
+            expiresUtc = (DateTime?)null,
             maxActivations,
             notes
         }, JsonOptions());
