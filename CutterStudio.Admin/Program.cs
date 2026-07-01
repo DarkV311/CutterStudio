@@ -166,6 +166,21 @@ app.MapPost("/admin/releases/create", async (HttpContext context, AdminRepositor
     await using (var stream = File.Create(path))
         await file.CopyToAsync(stream);
 
+    try
+    {
+        using var archive = System.IO.Compression.ZipFile.OpenRead(path);
+        if (!archive.Entries.Any(entry => entry.FullName.EndsWith("CutterStudio.exe", StringComparison.OrdinalIgnoreCase)))
+        {
+            File.Delete(path);
+            return Results.BadRequest("Release ZIP must contain CutterStudio.exe.");
+        }
+    }
+    catch
+    {
+        File.Delete(path);
+        return Results.BadRequest("Uploaded release file is not a valid ZIP archive.");
+    }
+
     var sha = await Sha256Async(path);
     var url = $"/downloads/{Uri.EscapeDataString(safeFile)}";
     await repo.CreateReleaseAsync(

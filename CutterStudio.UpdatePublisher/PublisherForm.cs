@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -334,9 +335,37 @@ public sealed class PublisherForm : Form
         if (latest is null || !latest.Available || !latest.Version.Equals(version, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Upload finished, but the server latest version is not {version}. Check the admin panel.");
 
+        await VerifyServerZipAsync(client, serverUrl, latest);
+
         Log($"Done. Server latest version is {latest.Version}.");
         Log($"Download URL: {serverUrl}{latest.DownloadUrl}");
         MessageBox.Show(this, $"Update v{latest.Version} uploaded successfully.\n\nClients will see it from the server.", "Update Publisher", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private static async Task VerifyServerZipAsync(HttpClient client, string serverUrl, LatestReleaseResponse latest)
+    {
+        var downloadUrl = latest.DownloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? latest.DownloadUrl
+            : $"{serverUrl.TrimEnd('/')}/{latest.DownloadUrl.TrimStart('/')}";
+        var tempPath = Path.Combine(Path.GetTempPath(), $"CutterStudioUploadVerify-{Guid.NewGuid():N}.zip");
+        try
+        {
+            await using (var input = await client.GetStreamAsync(downloadUrl))
+            await using (var output = File.Create(tempPath))
+                await input.CopyToAsync(output);
+
+            using var archive = ZipFile.OpenRead(tempPath);
+            if (!archive.Entries.Any(entry => entry.FullName.EndsWith("CutterStudio.exe", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Uploaded ZIP does not contain CutterStudio.exe.");
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new InvalidOperationException("Server accepted the upload, but the uploaded ZIP is corrupt. Upload again.", ex);
+        }
+        finally
+        {
+            try { File.Delete(tempPath); } catch { }
+        }
     }
 
     private sealed record LatestReleaseResponse(
